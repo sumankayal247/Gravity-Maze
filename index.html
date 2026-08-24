@@ -4,7 +4,8 @@ html,body,#game{margin:0;width:100%;height:100%;overflow:hidden;background:#0507
 </style></head><body><div id="game"></div><div id="hud"><div class="p"><div class="t">GRAVITY <span class="a">MAZE</span></div><div class="s">ROTATE THE WORLD · FOLLOW GRAVITY</div></div><div class="p stats"><div><small>Maze</small><b id="lv">01</b></div><div><small>Size</small><b id="sz">15 × 11</b></div><div><small>Rotation</small><b id="an">0°</b></div><div><small>Difficulty</small><b class="a" id="df">WARM-UP</b></div></div><div class="p ctl"><span class="k">A</span><span class="k">D</span> / <span class="k">←</span><span class="k">→</span> Rotate<br><span class="k">R</span> Restart</div></div>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script><script>
 const C=(v,a,b)=>Math.max(a,Math.min(b,v));
-const CFG=n=>{const s=Math.min(n-1,14);return{c:15+2*s,r:11+s,t:44-2*s}};
+// ORIGINAL CONFIG: const CFG=n=>{const s=Math.min(n-1,14);return{c:15+2*s,r:11+s,t:44-2*s}};
+const CFG=n=>{const s=Math.min(n-1,14);return{c:15+2*s,r:11+2*s,t:44-2*s}};
 const GEN=(c,r)=>{const g=Array.from({length:r},()=>Array(c).fill('#')),st=[{x:1,y:1}],ds=[[2,0],[-2,0],[0,2],[0,-2]];g[1][1]=' ';while(st.length){const p=st[st.length-1],o=ds.map(d=>({x:p.x+d[0],y:p.y+d[1],wx:p.x+d[0]/2,wy:p.y+d[1]/2})).filter(n=>n.x>0&&n.x<c-1&&n.y>0&&n.y<r-1&&g[n.y][n.x]=='#');if(!o.length){st.pop();continue}const n=o[Math.random()*o.length|0];g[n.wy][n.wx]=g[n.y][n.x]=' ';st.push({x:n.x,y:n.y})}const q=[{x:1,y:1,d:0}],seen=new Set(['1,1']);let far=q[0];for(let i=0;i<q.length;i++){const p=q[i];if(p.d>far.d)far=p;for(const d of ds){const x=p.x+d[0],y=p.y+d[1],k=x+','+y;if(x>0&&x<c-1&&y>0&&y<r-1&&g[y][x]==' '&&!seen.has(k)){seen.add(k);q.push({x,y,d:p.d+1})}}}g[far.y][far.x]='E';return g};
 class Maze extends Phaser.Scene{
 preload(){this.load.image('wall','wall.svg');this.load.image('floor','floor.svg');this.load.image('hole','blackhole.svg')}
