@@ -2,6 +2,8 @@ name: Diagnose Gravity Maze
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   diagnose:
@@ -27,9 +29,7 @@ jobs:
             const browser = await chromium.launch({headless:true});
             const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
             const errors = [];
-            page.on('console', msg => {
-              if (msg.type() === 'error') errors.push('CONSOLE: ' + msg.text());
-            });
+            page.on('console', msg => { if (msg.type() === 'error') errors.push('CONSOLE: ' + msg.text()); });
             page.on('pageerror', err => errors.push('PAGEERROR: ' + err.stack));
             page.on('requestfailed', req => errors.push('REQUEST FAILED: ' + req.url() + ' :: ' + req.failure()?.errorText));
             await page.goto('http://127.0.0.1:4173/index.html', { waitUntil: 'networkidle', timeout: 30000 });
