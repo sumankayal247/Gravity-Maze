@@ -1,0 +1,44 @@
+name: Fix mobile gravity syntax
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fix malformed orientation switch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text()
+          old = "case 180:gx=-gx;gy=-gy;break}case 270:{const t=gx;gx=gy;gy=-t;break}}return"
+          new = "case 180:gx=-gx;gy=-gy;break;case 270:{const t=gx;gx=gy;gy=-t;break}}return"
+          if old not in s:
+              raise SystemExit('Expected malformed switch sequence was not found.')
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+      - name: Commit and push fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Fix desktop game startup syntax error"
+          git push
+
+      - name: Remove temporary workflow
+        run: |
+          git rm .github/workflows/fix-mobile-gravity-syntax.yml
+          git commit -m "Remove temporary gravity fix workflow"
+          git push
