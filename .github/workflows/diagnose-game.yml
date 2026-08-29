@@ -1,0 +1,53 @@
+name: Diagnose Gravity Maze
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run browser diagnostics
+        run: |
+          python3 -m http.server 4173 >/tmp/server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          (async () => {
+            const browser = await chromium.launch({headless:true});
+            const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+            const errors = [];
+            page.on('console', msg => {
+              if (msg.type() === 'error') errors.push('CONSOLE: ' + msg.text());
+            });
+            page.on('pageerror', err => errors.push('PAGEERROR: ' + err.stack));
+            page.on('requestfailed', req => errors.push('REQUEST FAILED: ' + req.url() + ' :: ' + req.failure()?.errorText));
+            await page.goto('http://127.0.0.1:4173/index.html', { waitUntil: 'networkidle', timeout: 30000 });
+            await page.waitForTimeout(2000);
+            const canvasCount = await page.locator('canvas').count();
+            const canvasSize = canvasCount ? await page.locator('canvas').first().evaluate(c => ({width:c.width,height:c.height})) : null;
+            const gameChildren = await page.locator('#game').evaluate(el => el.children.length);
+            console.log(JSON.stringify({canvasCount, canvasSize, gameChildren, errors}, null, 2));
+            await page.screenshot({ path: '/tmp/gravity-maze.png', fullPage: false });
+            if (!canvasCount || errors.length) process.exitCode = 1;
+            await browser.close();
+          })();
+          NODE
+          cat /tmp/server.log || true
+
+      - name: Upload diagnostic screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gravity-maze-diagnostic
+          path: /tmp/gravity-maze.png
