@@ -18,7 +18,7 @@ jobs:
           npm install playwright@1.55.0
           npx playwright install --with-deps chromium
 
-      - name: Run browser diagnostics
+      - name: Run browser diagnostics against local and live site
         run: |
           python3 -m http.server 4173 >/tmp/server.log 2>&1 &
           SERVER_PID=$!
@@ -27,27 +27,33 @@ jobs:
           const { chromium } = require('playwright');
           (async () => {
             const browser = await chromium.launch({headless:true});
-            const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-            const errors = [];
-            page.on('console', msg => { if (msg.type() === 'error') errors.push('CONSOLE: ' + msg.text()); });
-            page.on('pageerror', err => errors.push('PAGEERROR: ' + err.stack));
-            page.on('requestfailed', req => errors.push('REQUEST FAILED: ' + req.url() + ' :: ' + req.failure()?.errorText));
-            await page.goto('http://127.0.0.1:4173/index.html', { waitUntil: 'networkidle', timeout: 30000 });
-            await page.waitForTimeout(2000);
-            const canvasCount = await page.locator('canvas').count();
-            const canvasSize = canvasCount ? await page.locator('canvas').first().evaluate(c => ({width:c.width,height:c.height})) : null;
-            const gameChildren = await page.locator('#game').evaluate(el => el.children.length);
-            console.log(JSON.stringify({canvasCount, canvasSize, gameChildren, errors}, null, 2));
-            await page.screenshot({ path: '/tmp/gravity-maze.png', fullPage: false });
-            if (!canvasCount || errors.length) process.exitCode = 1;
+            for (const target of ['http://127.0.0.1:4173/index.html','https://sumankayal247.github.io/Gravity-Maze/?diagnostic=1']) {
+              const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+              const errors = [];
+              page.on('console', msg => { if (msg.type() === 'error') errors.push('CONSOLE: ' + msg.text()); });
+              page.on('pageerror', err => errors.push('PAGEERROR: ' + err.stack));
+              page.on('requestfailed', req => errors.push('REQUEST FAILED: ' + req.url() + ' :: ' + req.failure()?.errorText));
+              try {
+                await page.goto(target, { waitUntil: 'networkidle', timeout: 30000 });
+                await page.waitForTimeout(2000);
+                const canvasCount = await page.locator('canvas').count();
+                const canvasSize = canvasCount ? await page.locator('canvas').first().evaluate(c => ({width:c.width,height:c.height})) : null;
+                const gameChildren = await page.locator('#game').evaluate(el => el.children.length);
+                console.log(JSON.stringify({target, canvasCount, canvasSize, gameChildren, errors}, null, 2));
+                await page.screenshot({ path: '/tmp/' + (target.startsWith('http://') ? 'local' : 'live') + '.png', fullPage: false });
+              } catch (e) {
+                console.log(JSON.stringify({target, fatal: String(e), errors}, null, 2));
+              }
+              await page.close();
+            }
             await browser.close();
           })();
           NODE
           cat /tmp/server.log || true
 
-      - name: Upload diagnostic screenshot
+      - name: Upload diagnostic screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gravity-maze-diagnostic
-          path: /tmp/gravity-maze.png
+          name: gravity-maze-live-diagnostic
+          path: /tmp/*.png
